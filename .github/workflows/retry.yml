@@ -1,0 +1,51 @@
+name: oci-retry
+
+# Solo schedule y workflow_dispatch. NUNCA pull_request / pull_request_target:
+# el repositorio es público y un fork podría intentar acceder a los secretos.
+on:
+  schedule:
+    - cron: '*/30 * * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: oci-retry
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write   # solo para desactivar este workflow al conseguir la máquina
+
+jobs:
+  retry:
+    runs-on: ubuntu-latest
+    timeout-minutes: 345
+    env:
+      OCI_USER: ${{ secrets.OCI_USER }}
+      OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+      OCI_TENANCY: ${{ secrets.OCI_TENANCY }}
+      OCI_KEY: ${{ secrets.OCI_KEY }}
+      OCI_SUBNET: ${{ secrets.OCI_SUBNET }}
+      OCI_IMAGE: ${{ secrets.OCI_IMAGE }}
+      SSH_PUB: ${{ secrets.SSH_PUB }}
+      WEBHOOK_URL: ${{ secrets.WEBHOOK_URL }}
+      WEBHOOK_TOKEN: ${{ secrets.WEBHOOK_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      AD: "InHD:EU-MADRID-1-AD-1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar OCI CLI
+        run: pip install --quiet oci-cli
+
+      - name: Configurar OCI
+        run: |
+          mkdir -p ~/.oci
+          printf '%s\n' "$OCI_KEY" > ~/.oci/key.pem
+          chmod 600 ~/.oci/key.pem
+          printf '%s\n' "$SSH_PUB" > ~/key.pub
+          printf '[DEFAULT]\nuser=%s\nfingerprint=%s\ntenancy=%s\nregion=eu-madrid-1\nkey_file=%s\n' \
+            "$OCI_USER" "$OCI_FINGERPRINT" "$OCI_TENANCY" "$HOME/.oci/key.pem" > ~/.oci/config
+          chmod 600 ~/.oci/config
+
+      - name: Reintentar hasta conseguir la máquina
+        run: bash scripts/retry.sh
