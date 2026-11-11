@@ -101,9 +101,10 @@ while [ "$SECONDS" -lt "$MAX_SECONDS" ]; do
     finish
   fi
 
-  # Fallo: mostrar solo un motivo corto y sin OCIDs.
-  MSG=$( { printf '%s\n' "$OUT"; cat /tmp/oci_err.txt; } 2>/dev/null | grep -m1 -E '"(code|message)"' \
-    | sed -E 's/ocid1\.[A-Za-z0-9._-]+/<ocid>/g' | cut -c1-160)
+  # Fallo: mostrar un motivo corto, sin OCIDs ni huellas (el log es público).
+  MSG=$( { printf '%s
+' "$OUT"; cat /tmp/oci_err.txt; } 2>/dev/null | grep -v '^[[:space:]]*$' | head -6     | sed -E 's/ocid1\.[A-Za-z0-9._-]+/<ocid>/g; s/([0-9a-fA-F]{2}:){7,}[0-9a-fA-F]{2}/<fp>/g' | cut -c1-200 | tr '
+' ' ')
   echo "$(date +%H:%M:%S) ${MSG:-sin mensaje}"
   sleep $((120 + RANDOM % 60))
 done
